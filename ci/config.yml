@@ -16,5 +16,5 @@ global:
 
 tests:
   quickstart-tibco-bwce:
-    parameter_input: quickstart-tibco-bwce-quickstart-withvpc-params1.json
-    template_file: quickstart-tibco-bwce-quickstart-withvpc.template
+    parameter_input: tibco-bwce-master-params.json
+    template_file: tibco-bwce-master.template
