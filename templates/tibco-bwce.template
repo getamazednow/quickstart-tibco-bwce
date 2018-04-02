@@ -126,12 +126,12 @@
     },
     "Parameters": {
         "ClusterSize": {
-            "Description": "Number of EC2 instances to be created initially in the ECS Cluster (1-1000). This value will be used to set the Min, Max & Desired count of instances in the Auto Scaling Group.",
+            "Description": "Number of EC2 instances to be created initially in the ECS Cluster (1-100). This value will be used to set the Min, Max & Desired count of instances in the Auto Scaling Group.",
             "Type": "Number",
             "Default": 2,
-            "MaxValue": 1000,
+            "MaxValue": 100,
             "MinValue": 1,
-            "ConstraintDescription": "ClusterSize must be numeric and between 1 and 1000."
+            "ConstraintDescription": "ClusterSize must be numeric and between 1 and 100."
         },
         "InstanceType": {
             "Description": "Select an instance type for EC2 instances to be created in the ECS cluster.",
@@ -1167,7 +1167,7 @@
                     "Ref": "ECSLaunchConfiguration"
                 },
                 "MinSize": "1",
-                "MaxSize": "1000",
+                "MaxSize": "100",
                 "DesiredCapacity": {
                     "Ref": "ClusterSize"
                 },
