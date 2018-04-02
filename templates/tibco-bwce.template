@@ -1,6 +1,6 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
-    "Description": "This template builds a base TIBCO BWCE docker image, creates an ECR repo with name 'tibco-bwce' and pushes base docker image into the ECR repo. It then leverages an existing VPC. \n",
+    "Description": "This template builds a base TIBCO BWCE docker image, creates an ECR repo with name 'tibco-bwce' and pushes base docker image into the ECR repo. It then leverages an existing VPC. License: Apache 2.0 (Please do not remove) Apr,2,2018 (qs-1oalbg1k9)",
     "Metadata": {
         "AWS::CloudFormation::Interface": {
             "ParameterGroups": [
@@ -124,7 +124,7 @@
             }
         }
     },
-    "Parameters":{
+    "Parameters": {
         "ClusterSize": {
             "Description": "Number of EC2 instances to be created initially in the ECS Cluster (1-1000). This value will be used to set the Min, Max & Desired count of instances in the Auto Scaling Group.",
             "Type": "Number",
@@ -208,7 +208,7 @@
             "Description": "Select an instance type that runs your BusinessWorks Container Edition studio.",
             "Type": "String",
             "Default": "m3.large",
-            "AllowedValues":[
+            "AllowedValues": [
                 "t2.large",
                 "t2.xlarge",
                 "t2.2xlarge",
@@ -241,7 +241,7 @@
             "MinValue": 30,
             "ConstraintDescription": "VolumeSize must be numeric and between 30 and 16384."
         },
-        "VolSizeStudioImage":{
+        "VolSizeStudioImage": {
             "Description": "Volume Size  (GB) for EC2 instance running BusinessWorks Container Edition studio.",
             "Type": "Number",
             "Default": 40,
@@ -797,10 +797,22 @@
                                 "sudo systemctl start docker\n",
                                 "sudo usermod -aG docker $USER\n",
                                 "\n",
-                                "pluginListName=", { "Ref" : "PluginList"}, "\n",
+                                "pluginListName=",
+                                {
+                                    "Ref": "PluginList"
+                                },
+                                "\n",
                                 "if [[ -n \"$pluginListName\" ]]; then\n",
-                                "    echo 'BWCE-AWS: Provided List of Plug-ins... ' ", { "Ref" : "PluginList"}, "\n",
-                                "    for pluginName in $(echo ", { "Ref" : "PluginList"}, " | tr ',' '\\n')\n",
+                                "    echo 'BWCE-AWS: Provided List of Plug-ins... ' ",
+                                {
+                                    "Ref": "PluginList"
+                                },
+                                "\n",
+                                "    for pluginName in $(echo ",
+                                {
+                                    "Ref": "PluginList"
+                                },
+                                " | tr ',' '\\n')\n",
                                 "    do\n",
                                 "        if [ $pluginName == 'DC' ]; then\n",
                                 "           echo 'BWCE-AWS: Copying DC Plugin Runtime...'\n",
@@ -838,13 +850,41 @@
                                 "    echo 'BWCE-AWS: List of Plug-ins not provided...'\n",
                                 "fi\n",
                                 "\n",
-                                "$( aws ecr get-login --region ", { "Ref" : "AWS::Region" }, " --no-include-email )\n",
+                                "$( aws ecr get-login --region ",
+                                {
+                                    "Ref": "AWS::Region"
+                                },
+                                " --no-include-email )\n",
                                 "sudo chmod +x /home/ec2-user/bwce/bwce-docker/createDockerImage.sh\n",
                                 "cd /home/ec2-user/bwce/bwce-docker/\n",
                                 "rm -f /home/ec2-user/bwce/bwce-docker/resources/bwce-runtime/bwceruntime-aws-2.3.3.zip\n",
                                 "./createDockerImage.sh /home/ec2-user/bwce/bwce-runtime/bwceruntime-aws-2.3.3.zip tibco/bwce:2.3.3\n",
-                                "docker tag tibco/bwce:2.3.3 ",{ "Ref": "AWS::AccountId"}, ".dkr.ecr.", { "Ref" : "AWS::Region" }, ".amazonaws.com/", { "Ref": "EcrRepoName" }, ":2.3.3\n",
-                                "docker push ",{ "Ref": "AWS::AccountId"}, ".dkr.ecr.", { "Ref" : "AWS::Region" }, ".amazonaws.com/", { "Ref": "EcrRepoName" }, ":2.3.3\n",
+                                "docker tag tibco/bwce:2.3.3 ",
+                                {
+                                    "Ref": "AWS::AccountId"
+                                },
+                                ".dkr.ecr.",
+                                {
+                                    "Ref": "AWS::Region"
+                                },
+                                ".amazonaws.com/",
+                                {
+                                    "Ref": "EcrRepoName"
+                                },
+                                ":2.3.3\n",
+                                "docker push ",
+                                {
+                                    "Ref": "AWS::AccountId"
+                                },
+                                ".dkr.ecr.",
+                                {
+                                    "Ref": "AWS::Region"
+                                },
+                                ".amazonaws.com/",
+                                {
+                                    "Ref": "EcrRepoName"
+                                },
+                                ":2.3.3\n",
                                 "   /opt/aws/bin/cfn-init -v --stack ",
                                 {
                                     "Ref": "AWS::StackName"
@@ -857,7 +897,11 @@
                                         "cfnInitEnd"
                                     ]
                                 },
-                                "    --region ", { "Ref" : "AWS::Region" }, "\n",
+                                "    --region ",
+                                {
+                                    "Ref": "AWS::Region"
+                                },
+                                "\n",
                                 "echo 'BWCE-AWS: End of EC2 Instance UserData execution, shutting down...'\n",
                                 "sudo poweroff\n"
                             ]
@@ -1308,42 +1352,42 @@
                         }
                     },
                     {
-                      "Fn::If": [
-                          "CreateS3Bucket",
-                          {
-                              "PolicyName": "s3-policy",
-                              "PolicyDocument": {
-                                  "Version": "2012-10-17",
-                                  "Statement": [
-                                      {
-                                          "Effect": "Allow",
-                                          "Action": [
-                                              "s3:ListBucket",
-                                              "s3:PutObject",
-                                              "s3:GetObject",
-                                              "s3:DeleteObject",
-                                              "s3:ListObject"
-                                          ],
-                                          "Resource": {
-                                              "Fn::Join": [
-                                                  "",
-                                                  [
-                                                      "arn:aws:s3:::",
-                                                      {
-                                                          "Ref": "BWCEArtifactsBucket"
-                                                      },
-                                                      "/*"
-                                                  ]
-                                              ]
-                                          }
-                                      }
-                                  ]
-                              }
-                          },
-                          {
-                              "Ref": "AWS::NoValue"
-                          }
-                      ]
+                        "Fn::If": [
+                            "CreateS3Bucket",
+                            {
+                                "PolicyName": "s3-policy",
+                                "PolicyDocument": {
+                                    "Version": "2012-10-17",
+                                    "Statement": [
+                                        {
+                                            "Effect": "Allow",
+                                            "Action": [
+                                                "s3:ListBucket",
+                                                "s3:PutObject",
+                                                "s3:GetObject",
+                                                "s3:DeleteObject",
+                                                "s3:ListObject"
+                                            ],
+                                            "Resource": {
+                                                "Fn::Join": [
+                                                    "",
+                                                    [
+                                                        "arn:aws:s3:::",
+                                                        {
+                                                            "Ref": "BWCEArtifactsBucket"
+                                                        },
+                                                        "/*"
+                                                    ]
+                                                ]
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                            {
+                                "Ref": "AWS::NoValue"
+                            }
+                        ]
                     }
                 ]
             }
@@ -1415,7 +1459,15 @@
                         "Fn::Join": [
                             "",
                             [
-                                "https://console.aws.amazon.com/s3/home?region=", { "Ref" : "AWS::Region" }, "&bucket=", { "Ref" : "BWCEArtifactsBucket" },""
+                                "https://console.aws.amazon.com/s3/home?region=",
+                                {
+                                    "Ref": "AWS::Region"
+                                },
+                                "&bucket=",
+                                {
+                                    "Ref": "BWCEArtifactsBucket"
+                                },
+                                ""
                             ]
                         ]
                     },
