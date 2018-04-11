@@ -27,6 +27,7 @@
                         "InstanceType",
                         "VolSize",
                         "InstanceTypeStudioImage",
+                        "StudioPassword",
                         "VolSizeStudioImage",
                         "KeyName"
                     ]
@@ -93,6 +94,9 @@
                 },
                 "InstanceTypeStudioImage": {
                     "default": "Studio EC2 Instance Type:"
+                },
+                "StudioPassword": {
+                    "default": "Studio Password:"
                 },
                 "VolSizeStudioImage": {
                     "default": "Studio EC2 Volume Size:"
@@ -249,6 +253,13 @@
             "MinValue": 40,
             "ConstraintDescription": "VolSizeStudioImage must be numeric and between 40 and 100."
         },
+        "StudioPassword": {
+            "Description": "Password to access the BWCE studio via VNC",
+            "Type": "String",
+            "MinLength": 1,
+            "MaxLength": 8,
+            "ConstraintDescription": "This password needs to be set in order to access your BWCE studio instance. The max length of this password is 8 characters."
+        },
         "KeyName": {
             "Description": "Select an existing key pair. You must provide existing key pair to be able to SSH into EC2 instances.",
             "Type": "AWS::EC2::KeyPair::KeyName",
@@ -402,18 +413,6 @@
         }
     },
     "Conditions": {
-        "HasKeyName": {
-            "Fn::Not": [
-                {
-                    "Fn::Equals": [
-                        {
-                            "Ref": "KeyName"
-                        },
-                        ""
-                    ]
-                }
-            ]
-        },
         "CreateS3Bucket": {
             "Fn::Equals": [
                 {
@@ -606,7 +605,9 @@
                         "CidrIp": {
                             "Ref": "AdminIngressLocation"
                         },
-                        "IpProtocol": -1
+                        "IpProtocol": "tcp",
+                        "FromPort": "8080",
+                        "ToPort": "8080"
                     }
                 ],
                 "Tags": [
@@ -630,6 +631,13 @@
                 "RepositoryName": {
                     "Ref": "EcrRepoName"
                 }
+            }
+        },
+        "MonitoringRepository": {
+            "Type": "AWS::ECR::Repository",
+            "Condition": "InstallMonitoringApp",
+            "Properties": {
+                "RepositoryName": "mon-repo-233"
             }
         },
         "DefaultTargetGroup": {
@@ -704,17 +712,6 @@
                 "InstanceType": {
                     "Ref": "MonInstanceType"
                 },
-                "KeyName": {
-                    "Fn::If": [
-                        "HasKeyName",
-                        {
-                            "Ref": "KeyName"
-                        },
-                        {
-                            "Ref": "AWS::NoValue"
-                        }
-                    ]
-                },
                 "IamInstanceProfile": {
                     "Ref": "ECSInstanceProfile"
                 },
@@ -740,46 +737,125 @@
                 "UserData": {
                     "Fn::Base64": {
                         "Fn::Join": [
-                            "\n",
+                            "",
                             [
-                                "#!/bin/bash",
-                                "echo 'BWCE-AWS: Start of Monitoring Instance UserData execution...'",
-                                "export PATH=/home/ec2-user/.local/bin:$PATH",
-                                "export PYTHONPATH=$PYTHONPATH:/home/ec2-user/.local/lib/python2.7/site-packages",
-                                "",
-                                "echo 'BWCE-AWS: Install Docker-ce...'",
-                                "sudo yum install -y yum-utils device-mapper-persistent-data lvm2",
-                                "sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo",
-                                "sudo yum -y install docker-ce",
-                                "sudo systemctl start docker",
-                                "sudo usermod -aG docker $USER",
-                                "",
-                                "echo 'BWCE-AWS: Install Docker-Compose...'",
-                                "sudo pip install docker-compose",
-                                "sudo yum upgrade -y python*",
-                                "",
-                                "echo 'BWCE-AWS: Install Monitoring Application...'",
+                                "#!/bin/bash\n",
+                                "echo 'BWCE-AWS: Start of Monitoring Instance UserData execution...'\n",
+                                "export PATH=/home/ec2-user/.local/bin:$PATH\n",
+                                "export PYTHONPATH=$PYTHONPATH:/home/ec2-user/.local/lib/python2.7/site-packages\n",
+                                "\n",
+                                "echo 'BWCE-AWS: Install Docker-ce...'\n",
+                                "sudo yum install -y yum-utils device-mapper-persistent-data lvm2\n",
+                                "sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo\n",
+                                "sudo yum -y install docker-ce\n",
+                                "sudo systemctl start docker\n",
+                                "sudo usermod -aG docker $USER\n",
+                                "\n",
+                                "echo 'BWCE-AWS: Install Docker-Compose...'\n",
+                                "sudo pip install docker-compose\n",
+                                "sudo yum upgrade -y python*\n",
+                                "\n",
+                                "echo 'BWCE-AWS: Install Monitoring Application...'\n",
                                 {
                                     "Fn::Sub": "$( aws ecr get-login --region ${AWS::Region} --no-include-email )"
                                 },
-                                "cd /home/ec2-user/bwce/bwce-mon/",
-                                "docker-compose up -d mysql_db",
-                                "docker-compose up -d mon_app",
-                                "",
-                                "if aws ecr describe-repositories --region ${AWS::Region} --repository-names tibco-bwce-mon | grep repositoryUri; then",
-                                "    echo 'BWCE-AWS: Repository already exists, skipping repository creation...'",
-                                "else ",
-                                "    aws ecr create-repository --region ${AWS::Region} --repository-name tibco-bwce-mon",
-                                "fi",
+                                "\n",
+                                "cd /home/ec2-user/bwce/bwce-mon/\n",
+                                "docker-compose up -d mysql_db\n",
+                                "docker-compose up -d mon_app\n",
+                                "\n",
+                                "/opt/aws/bin/cfn-init -v --stack ",
                                 {
-                                    "Fn::Sub": "docker tag bwcemon_mon_app:latest ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/tibco-bwce-mon:2.3.3"
+                                    "Ref": "AWS::StackName"
                                 },
+                                " --resource MonitoringInstance --configsets ",
                                 {
-                                    "Fn::Sub": "docker push ${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/tibco-bwce-mon:2.3.3"
+                                    "Fn::If": [
+                                        "InstallMonitoringApp",
+                                        "quickstartwithMonRepo",
+                                        "endMessage"
+                                    ]
                                 },
-                                "echo 'BWCE-AWS: End of Monitoring Instance UserData execution...'"
+                                "\n",
+                                "echo 'BWCE-AWS: End of Monitoring Instance UserData execution...'\n"
                             ]
                         ]
+                    }
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Init": {
+                    "configSets": {
+                        "quickstartwithMonRepo": [
+                            "MonRepoCreation",
+                            "endMessage"
+                        ],
+                        "cfnInitEnd": [
+                            "endMessage"
+                        ]
+                    },
+                    "MonRepoCreation": {
+                        "commands": {
+                            "01_create_repo": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "#!/bin/bash\n",
+                                            "docker tag bwcemon_mon_app:latest ",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ".dkr.ecr.",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ".amazonaws.com/",
+                                            {
+                                                "Fn::If": [
+                                                    "InstallMonitoringApp",
+                                                    {
+                                                        "Ref": "MonitoringRepository"
+                                                    },
+                                                    {
+                                                        "Ref": "AWS::NoValue"
+                                                    }
+                                                ]
+                                            },
+                                            ":2.3.3\n",
+                                            "docker push ",
+                                            {
+                                                "Ref": "AWS::AccountId"
+                                            },
+                                            ".dkr.ecr.",
+                                            {
+                                                "Ref": "AWS::Region"
+                                            },
+                                            ".amazonaws.com/",
+                                            {
+                                                "Fn::If": [
+                                                    "InstallMonitoringApp",
+                                                    {
+                                                        "Ref": "MonitoringRepository"
+                                                    },
+                                                    {
+                                                        "Ref": "AWS::NoValue"
+                                                    }
+                                                ]
+                                            },
+                                            ":2.3.3\n"
+                                        ]
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "endMessage": {
+                        "commands": {
+                            "02_end_Message": {
+                                "command": "echo 'end cfn-init...'"
+                            }
+                        }
                     }
                 }
             }
@@ -797,17 +873,6 @@
                     ]
                 },
                 "InstanceType": "t2.medium",
-                "KeyName": {
-                    "Fn::If": [
-                        "HasKeyName",
-                        {
-                            "Ref": "KeyName"
-                        },
-                        {
-                            "Ref": "AWS::NoValue"
-                        }
-                    ]
-                },
                 "IamInstanceProfile": {
                     "Ref": "ECSInstanceProfile"
                 },
@@ -1077,17 +1142,6 @@
                 "InstanceType": {
                     "Ref": "InstanceTypeStudioImage"
                 },
-                "KeyName": {
-                    "Fn::If": [
-                        "HasKeyName",
-                        {
-                            "Ref": "KeyName"
-                        },
-                        {
-                            "Ref": "AWS::NoValue"
-                        }
-                    ]
-                },
                 "SecurityGroupIds": [
                     {
                         "Ref": "EC2SecurityGroup"
@@ -1104,40 +1158,45 @@
                         }
                     }
                 ],
+                "IamInstanceProfile": {
+                    "Ref": "EC2InstanceProfile"
+                },
                 "UserData": {
                     "Fn::Base64": {
                         "Fn::Join": [
-                            "\n",
+                            "",
                             [
-                                "#!/bin/bash",
-                                "yum update -y",
-                                "echo 'BWCE-AWS: Install Docker-ce...'",
-                                "yum install -y yum-utils device-mapper-persistent-data lvm2",
-                                "yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo",
-                                "yum -y install docker-ce",
-                                "systemctl start docker",
-                                "usermod -aG docker ec2-user",
-                                "yum groupinstall -y 'GNOME Desktop' 'Graphical Administration Tools'",
-                                "yum install -y tigervnc-server xorg-x11-fonts-Type1",
-                                "cp /lib/systemd/system/vncserver@.service /etc/systemd/system/vncserver@:5.service",
-                                "sed -i -e 's/<USER>/ec2-user/g' /etc/systemd/system/vncserver@:5.service",
-                                "mkdir '/home/ec2-user/bwce/bwce-studio'",
-                                "chmod 755 '/home/ec2-user/bwce/bwce-studio' ",
-                                "mkdir '/home/ec2-user/bwce/installers/bwce/BWCE-install'",
-                                "unzip '/home/ec2-user/bwce/installers/bwce/TIB_bwce_2.3.3_linux26gl23_x86_64.zip' -d '/home/ec2-user/bwce/installers/bwce/BWCE-install'",
-                                "sed -i -e 's#/opt/tibco/bwce#/home/ec2-user/bwce/bwce-studio#g' /home/ec2-user/bwce/installers/bwce/BWCE-install/TIBCOUniversalInstaller_bwce_2.3.3.silent",
-                                "cd /home/ec2-user/bwce/installers/bwce/BWCE-install",
-                                "./TIBCOUniversalInstaller-lnx-x86-64.bin -silent",
-                                "mkdir -p '/home/ec2-user/.vnc'",
-                                "chmod 777 '/home/ec2-user/.vnc'",
+                                "#!/bin/bash\n",
+                                "yum update -y\n",
+                                "echo 'BWCE-AWS: Install Docker-ce...'\n",
+                                "yum install -y yum-utils device-mapper-persistent-data lvm2\n",
+                                "yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo\n",
+                                "yum -y install docker-ce\n",
+                                "systemctl start docker\n",
+                                "usermod -aG docker ec2-user\n",
+                                "yum groupinstall -y 'GNOME Desktop' 'Graphical Administration Tools'\n",
+                                "yum install -y tigervnc-server xorg-x11-fonts-Type1\n",
+                                "cp /lib/systemd/system/vncserver@.service /etc/systemd/system/vncserver@:5.service\n",
+                                "sed -i -e 's/<USER>/ec2-user/g' /etc/systemd/system/vncserver@:5.service\n",
+                                "mkdir '/home/ec2-user/bwce/bwce-studio'\n",
+                                "chmod 755 '/home/ec2-user/bwce/bwce-studio'\n",
+                                "mkdir '/home/ec2-user/bwce/installers/bwce/BWCE-install'\n",
+                                "unzip '/home/ec2-user/bwce/installers/bwce/TIB_bwce_2.3.3_linux26gl23_x86_64.zip' -d '/home/ec2-user/bwce/installers/bwce/BWCE-install'\n",
+                                "sed -i -e 's#/opt/tibco/bwce#/home/ec2-user/bwce/bwce-studio#g' /home/ec2-user/bwce/installers/bwce/BWCE-install/TIBCOUniversalInstaller_bwce_2.3.3.silent\n",
+                                "cd /home/ec2-user/bwce/installers/bwce/BWCE-install\n",
+                                "./TIBCOUniversalInstaller-lnx-x86-64.bin -silent\n",
+                                "mkdir -p '/home/ec2-user/.vnc'\n",
+                                "chmod 777 '/home/ec2-user/.vnc'\n",
+                                "runuser -l ec2-user -c 'vncpasswd -f <<<",
                                 {
-                                    "Fn::Sub": "runuser -l ec2-user -c 'vncpasswd -f <<<${AWS::StackName} > '/home/ec2-user/.vnc/passwd''"
+                                    "Ref": "StudioPassword"
                                 },
-                                "runuser -l ec2-user -c 'chmod 600 '/home/ec2-user/.vnc/passwd''",
-                                "runuser -l ec2-user -c 'vncserver'",
-                                "systemctl daemon-reload",
-                                "systemctl start vncserver@:5.service",
-                                "systemctl enable vncserver@:5.service"
+                                " > '/home/ec2-user/.vnc/passwd''\n",
+                                "runuser -l ec2-user -c 'chmod 600 '/home/ec2-user/.vnc/passwd''\n",
+                                "runuser -l ec2-user -c 'vncserver'\n",
+                                "systemctl daemon-reload\n",
+                                "systemctl start vncserver@:5.service\n",
+                                "systemctl enable vncserver@:5.service\n"
                             ]
                         ]
                     }
@@ -1209,17 +1268,6 @@
                 },
                 "InstanceType": {
                     "Ref": "InstanceType"
-                },
-                "KeyName": {
-                    "Fn::If": [
-                        "HasKeyName",
-                        {
-                            "Ref": "KeyName"
-                        },
-                        {
-                            "Ref": "AWS::NoValue"
-                        }
-                    ]
                 },
                 "BlockDeviceMappings": [
                     {
@@ -1328,6 +1376,56 @@
                         }
                     }
                 }
+            }
+        },
+        "StudioRole":{
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "Path": "/",
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "ec2.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Policies": [
+                    {
+                        "PolicyName": "ecs-ec2-policy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ecs:*"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "EC2InstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "StudioRole"
+                    }
+                ]
             }
         },
         "ECSRole": {
@@ -1527,9 +1625,12 @@
             }
         },
         "EC2Instance": {
-            "Description": "A reference to the EC2 Instance",
+            "Description": "IP address of the BWCE Studio Instance",
             "Value": {
-                "Fn::Sub": "https://console.aws.amazon.com/ec2/v2/home?region=${AWS::Region}#Instances:sort=instanceState"
+                "Fn::GetAtt": [
+                    "StudioEC2Instance",
+                    "PublicIp"
+                ]
             }
         },
         "AutoScalingGroup": {
@@ -1548,6 +1649,12 @@
             "Description": "A reference to the Amazon ECR (Amazon EC2 Container Registry).",
             "Value": {
                 "Fn::Sub": "https://console.aws.amazon.com/ecs/home?region=${AWS::Region}#/repositories/${EcrRepoName}#images"
+            }
+        },
+        "StudioPasswordValue": {
+            "Description": "The password set for your BusinessWorks Studio EC2 Instance",
+            "Value": {
+                "Ref": "StudioPassword"
             }
         },
         "S3Bucket": {

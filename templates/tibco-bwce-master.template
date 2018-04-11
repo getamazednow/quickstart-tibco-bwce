@@ -179,6 +179,13 @@
             "MinValue": 40,
             "ConstraintDescription": "VolSizeStudioImage must be numeric and between 40 and 100."
         },
+        "StudioPassword": {
+            "Description": "Password to access the BWCE studio via VNC",
+            "Type": "String",
+            "MinLength": 1,
+            "MaxLength": 8,
+            "ConstraintDescription": "This password needs to be set in order to access your BWCE studio instance. The max length of this password is 8 characters."
+        },
         "KeyName": {
             "Description": "Select an existing key pair. You must provide existing key pair to be able to SSH into EC2 instances.",
             "Type": "AWS::EC2::KeyPair::KeyName",
@@ -326,6 +333,7 @@
                         "InstanceType",
                         "VolSize",
                         "InstanceTypeStudioImage",
+                        "StudioPassword",
                         "VolSizeStudioImage"
                     ]
                 },
@@ -385,6 +393,9 @@
                 },
                 "VolSize": {
                     "default": "ECS Cluster Volume Size:"
+                },
+                "StudioPassword": {
+                    "default": "Studio Password:"
                 },
                 "InstanceTypeStudioImage": {
                     "default": "Studio EC2 Instance Type:"
@@ -639,6 +650,9 @@
                     },
                     "VolSizeStudioImage": {
                         "Ref": "VolSizeStudioImage"
+                    },
+                    "StudioPassword": {
+                        "Ref": "StudioPassword"
                     },
                     "EcrRepoName": {
                         "Ref": "EcrRepoName"
