@@ -184,6 +184,7 @@
             "Type": "String",
             "MinLength": 1,
             "MaxLength": 8,
+            "NoEcho": "true",
             "ConstraintDescription": "This password needs to be set in order to access your BWCE studio instance. The max length of this password is 8 characters."
         },
         "KeyName": {

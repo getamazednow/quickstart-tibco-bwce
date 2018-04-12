@@ -258,6 +258,7 @@
             "Type": "String",
             "MinLength": 1,
             "MaxLength": 8,
+            "NoEcho": "true",
             "ConstraintDescription": "This password needs to be set in order to access your BWCE studio instance. The max length of this password is 8 characters."
         },
         "KeyName": {
@@ -1129,6 +1130,22 @@
         },
         "StudioEC2Instance": {
             "Type": "AWS::EC2::Instance",
+            "Metadata": {
+                "AWS::CloudFormation::Init": {
+                    "config": {
+                        "files": {
+                            "/tmp/studio_pass.txt": {
+                                "content": {
+                                    "Ref": "StudioPassword"
+                                },
+                                "mode": "000644",
+                                "owner": "ec2-user",
+                                "group": "ec2-user"
+                            }
+                        }
+                    }
+                }
+            },
             "Properties": {
                 "ImageId": {
                     "Fn::FindInMap": [
@@ -1168,6 +1185,17 @@
                             [
                                 "#!/bin/bash\n",
                                 "yum update -y\n",
+                                "#!/bin/bash\n",
+                                "/opt/aws/bin/cfn-init -v --stack ",
+                                {
+                                    "Ref": "AWS::StackName"
+                                },
+                                " --resource StudioEC2Instance ",
+                                " --region ",
+                                {
+                                    "Ref": "AWS::Region"
+                                },
+                                "\n",
                                 "echo 'BWCE-AWS: Install Docker-ce...'\n",
                                 "yum install -y yum-utils device-mapper-persistent-data lvm2\n",
                                 "yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo\n",
@@ -1187,16 +1215,14 @@
                                 "./TIBCOUniversalInstaller-lnx-x86-64.bin -silent\n",
                                 "mkdir -p '/home/ec2-user/.vnc'\n",
                                 "chmod 777 '/home/ec2-user/.vnc'\n",
-                                "runuser -l ec2-user -c 'vncpasswd -f <<<",
-                                {
-                                    "Ref": "StudioPassword"
-                                },
+                                "runuser -l ec2-user -c 'vncpasswd -f <<< $(cat /tmp/studio_pass.txt)",
                                 " > '/home/ec2-user/.vnc/passwd''\n",
                                 "runuser -l ec2-user -c 'chmod 600 '/home/ec2-user/.vnc/passwd''\n",
                                 "runuser -l ec2-user -c 'vncserver'\n",
                                 "systemctl daemon-reload\n",
                                 "systemctl start vncserver@:5.service\n",
-                                "systemctl enable vncserver@:5.service\n"
+                                "systemctl enable vncserver@:5.service\n",
+                                "rm /tmp/studio_pass.txt\n"
                             ]
                         ]
                     }
@@ -1400,14 +1426,45 @@
                 },
                 "Policies": [
                     {
-                        "PolicyName": "ecs-ec2-policy",
+                        "PolicyName": "ecs-policy",
                         "PolicyDocument": {
                             "Version": "2012-10-17",
                             "Statement": [
                                 {
                                     "Effect": "Allow",
                                     "Action": [
-                                        "ecs:*"
+                                        "ecs:DeregisterContainerInstance",
+                                        "ecs:DiscoverPollEndpoint",
+                                        "ecs:Poll",
+                                        "ecs:RegisterContainerInstance",
+                                        "ecs:StartTelemetrySession",
+                                        "ecs:UpdateContainerInstancesState",
+                                        "ecs:Submit*"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "PolicyName": "ecr-policy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ecr:GetAuthorizationToken",
+                                        "ecr:BatchCheckLayerAvailability",
+                                        "ecr:GetDownloadUrlForLayer",
+                                        "ecr:GetRepositoryPolicy",
+                                        "ecr:DescribeRepositories",
+                                        "ecr:ListImages",
+                                        "ecr:BatchGetImage",
+                                        "ecr:InitiateLayerUpload",
+                                        "ecr:UploadLayerPart",
+                                        "ecr:CompleteLayerUpload",
+                                        "ecr:PutImage"
                                     ],
                                     "Resource": "*"
                                 }
@@ -1482,7 +1539,7 @@
                                         "ecr:BatchCheckLayerAvailability",
                                         "ecr:GetDownloadUrlForLayer",
                                         "ecr:GetRepositoryPolicy",
-                                        "ecr:DescribeRepository",
+                                        "ecr:DescribeRepositories",
                                         "ecr:ListImages",
                                         "ecr:BatchGetImage",
                                         "ecr:InitiateLayerUpload",
@@ -1624,7 +1681,7 @@
                 "Fn::Sub": "https://console.aws.amazon.com/ec2/v2/home?region=${AWS::Region}#TargetGroups:search=${AWS::StackName}-default"
             }
         },
-        "EC2Instance": {
+        "StudioEC2Instance": {
             "Description": "IP address of the BWCE Studio Instance",
             "Value": {
                 "Fn::GetAtt": [
@@ -1649,12 +1706,6 @@
             "Description": "A reference to the Amazon ECR (Amazon EC2 Container Registry).",
             "Value": {
                 "Fn::Sub": "https://console.aws.amazon.com/ecs/home?region=${AWS::Region}#/repositories/${EcrRepoName}#images"
-            }
-        },
-        "StudioPasswordValue": {
-            "Description": "The password set for your BusinessWorks Studio EC2 Instance",
-            "Value": {
-                "Ref": "StudioPassword"
             }
         },
         "S3Bucket": {
