@@ -1185,7 +1185,6 @@
                             [
                                 "#!/bin/bash\n",
                                 "yum update -y\n",
-                                "#!/bin/bash\n",
                                 "/opt/aws/bin/cfn-init -v --stack ",
                                 {
                                     "Ref": "AWS::StackName"
@@ -1323,34 +1322,7 @@
                 },
                 "UserData": {
                     "Fn::Base64": {
-                        "Fn::Join": [
-                            "\n",
-                            [
-                                "#!/bin/bash",
-                                {
-                                    "Fn::Sub": "echo ECS_CLUSTER=${ECSCluster} >> /etc/ecs/ecs.config"
-                                },
-                                "echo ECS_CHECKPOINT=false >> /etc/ecs/ecs.config",
-                                "echo ECS_ENGINE_TASK_CLEANUP_WAIT_DURATION=8m >> /etc/ecs/ecs.config",
-                                "echo ECS_DISABLE_IMAGE_CLEANUP=false >> /etc/ecs/ecs.config",
-                                "echo ECS_IMAGE_CLEANUP_INTERVAL=15m >> /etc/ecs/ecs.config",
-                                "echo ECS_IMAGE_MINIMUM_CLEANUP_AGE=1h >> /etc/ecs/ecs.config",
-                                "echo ECS_NUM_IMAGES_DELETE_PER_CYCLE=5 >> /etc/ecs/ecs.config",
-                                "sudo systemctl enable docker-container@ecs-agent.service",
-                                "sudo systemctl start docker-container@ecs-agent.service",
-                                {
-                                    "Fn::Sub": "/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration"
-                                },
-                                {
-                                    "Fn::Sub": "/opt/aws/bin/cfn-signal -e $? --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSAutoScalingGroup"
-                                },
-                                "export PATH=/home/ec2-user/.local/bin:$PATH",
-                                "export PYTHONPATH=$PYTHONPATH:/home/ec2-user/.local/lib/python2.7/site-packages",
-                                {
-                                    "Fn::Sub": "$( aws ecr get-login --region ${AWS::Region} --no-include-email )"
-                                }
-                            ]
-                        ]
+                        "Fn::Sub": "#!/bin/bash\necho 'BWCE-AWS: Install Docker-ce...'\nsudo yum install -y yum-utils device-mapper-persistent-data lvm2\nsudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo\nsudo yum install -y docker-ce\nsudo systemctl start docker\nsudo usermod -aG docker $USER\ncd /tmp\ncd -\necho ECS_CLUSTER=${ECSCluster} >> /etc/ecs/ecs.config\necho ECS_CHECKPOINT=false >> /etc/ecs/ecs.config\necho ECS_ENGINE_TASK_CLEANUP_WAIT_DURATION=8m >> /etc/ecs/ecs.config\necho ECS_DISABLE_IMAGE_CLEANUP=false >> /etc/ecs/ecs.config\necho ECS_IMAGE_CLEANUP_INTERVAL=15m >> /etc/ecs/ecs.config\necho ECS_IMAGE_MINIMUM_CLEANUP_AGE=1h >> /etc/ecs/ecs.config\necho ECS_NUM_IMAGES_DELETE_PER_CYCLE=5 >> /etc/ecs/ecs.config\nsudo systemctl enable docker-container@ecs-agent.service\nsudo systemctl start docker-container@ecs-agent.service\n/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration\n/opt/aws/bin/cfn-signal -e $? --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSAutoScalingGroup\nexport PATH=/home/ec2-user/.local/bin:$PATH\nexport PYTHONPATH=$PYTHONPATH:/home/ec2-user/.local/lib/python2.7/site-packages\n$( aws ecr get-login --region ${AWS::Region} --no-include-email )\n"
                     }
                 }
             },
@@ -1415,7 +1387,8 @@
                             "Effect": "Allow",
                             "Principal": {
                                 "Service": [
-                                    "ec2.amazonaws.com"
+                                    "ec2.amazonaws.com",
+                                    "ecs.amazonaws.com"
                                 ]
                             },
                             "Action": [
@@ -1439,7 +1412,8 @@
                                         "ecs:RegisterContainerInstance",
                                         "ecs:StartTelemetrySession",
                                         "ecs:UpdateContainerInstancesState",
-                                        "ecs:Submit*"
+                                        "ecs:Submit*",
+                                        "ecs:CreateService"
                                     ],
                                     "Resource": "*"
                                 }
@@ -1465,6 +1439,22 @@
                                         "ecr:UploadLayerPart",
                                         "ecr:CompleteLayerUpload",
                                         "ecr:PutImage"
+                                    ],
+                                    "Resource": "*"
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "PolicyName": "extra-policy",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "iam:PassRole",
+                                        "elasticloadbalancing:Describe*"
                                     ],
                                     "Resource": "*"
                                 }
@@ -1676,9 +1666,9 @@
             }
         },
         "DefaultTargetGroup": {
-            "Description": "A reference to the default Target Group for Application Load Balancer.",
+            "Description": "A reference to the ARN of the default Target Group for the Application Load Balancer.",
             "Value": {
-                "Fn::Sub": "https://console.aws.amazon.com/ec2/v2/home?region=${AWS::Region}#TargetGroups:search=${AWS::StackName}-default"
+                "Ref": "DefaultTargetGroup"
             }
         },
         "StudioEC2Instance": {
@@ -1694,6 +1684,12 @@
             "Description": "A reference to the Auto Scaling Group.",
             "Value": {
                 "Fn::Sub": "https://console.aws.amazon.com/ec2/autoscaling/home?region=${AWS::Region}#AutoScalingGroups:id=${ECSAutoScalingGroup}"
+            }
+        },
+        "ECSClusterName": {
+            "Description": "Name of the ECS Cluster created",
+            "Value": {
+                "Ref": "ECSCluster"
             }
         },
         "ECSCluster": {
