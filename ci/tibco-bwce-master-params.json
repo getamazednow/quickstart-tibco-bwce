@@ -24,10 +24,6 @@
         "ParameterValue": "40"
     },
     {
-        "ParameterKey": "EcrRepoName",
-        "ParameterValue": "$[taskcat_random-string]"
-    },
-    {
         "ParameterKey": "ExtBucket",
         "ParameterValue": "No"
     },

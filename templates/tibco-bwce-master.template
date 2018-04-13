@@ -209,13 +209,6 @@
             "Description": "Provide list of IDs of supported Plug-ins to be added in the customized image, e.g. for including Data Conversion, MongoDB and S3 plug-ins, provide the value as 'DC,MongoDB,S3'. This list should be comma separated and should not include any space inbetween. The list of supported Plug-ins are - AMQP (Plug-in for AMQP), DC (Plug-in for Data Conversion), DCRM (Plug-in for Microsoft Dynamics CRM), Kafka (Plug-in for Apache Kafka), MongoDB (Plug-in for MongoDB), MQ (Plug-in for WebSphere MQ), OData (Plug-in for OData), S3 (Plug-in for Amazon S3), ServiceNow (Plug-in for ServiceNow), SFDC (Plug-in for Salesforce.com).",
             "Type": "String"
         },
-        "EcrRepoName": {
-            "Description": "Name of EC2 Container Registry (ECR) to be created to store customized image. This image will have the plugins you selected installed within it.",
-            "Type": "String",
-            "MinLength": 4,
-            "MaxLength": 64,
-            "ConstraintDescription": "EcrRepoName parameter is mandatory."
-        },
         "InstMonitoring": {
             "Description": "Do you want to install monitoring application?",
             "Type": "String",
@@ -343,7 +336,6 @@
                         "default": "Base Image Customization Configuration"
                     },
                     "Parameters": [
-                        "EcrRepoName",
                         "PluginList",
                         "ExtBucket"
                     ]
@@ -412,9 +404,6 @@
                 },
                 "PluginList": {
                     "default": "List of Plug-ins:"
-                },
-                "EcrRepoName": {
-                    "default": "ECR Repo Name"
                 },
                 "InstMonitoring": {
                     "default": "Install Monitoring Application?"
@@ -654,9 +643,6 @@
                     },
                     "StudioPassword": {
                         "Ref": "StudioPassword"
-                    },
-                    "EcrRepoName": {
-                        "Ref": "EcrRepoName"
                     },
                     "PluginList": {
                         "Ref": "PluginList"

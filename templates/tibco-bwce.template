@@ -37,7 +37,6 @@
                         "default": "Base Image Customization Configuration"
                     },
                     "Parameters": [
-                        "EcrRepoName",
                         "PluginList",
                         "ExtBucket"
                     ]
@@ -109,9 +108,6 @@
                 },
                 "PluginList": {
                     "default": "List of Plug-ins:"
-                },
-                "EcrRepoName": {
-                    "default": "ECR Repo Name"
                 },
                 "QSS3BucketName": {
                     "default": "Quick Start S3 Bucket Name"
@@ -283,13 +279,6 @@
             "Description": "Provide list of IDs of supported Plug-ins to be added in the customized image, e.g. for including Data Conversion, MongoDB and S3 plug-ins, provide the value as 'DC, MongoDB, S3'. This list should be comma separated and should not include any space inbetween. The list of supported Plug-ins are - AMQP (Plug-in for AMQP), DC (Plug-in for Data Conversion), DCRM (Plug-in for Microsoft Dynamics CRM), Kafka (Plug-in for Apache Kafka), MongoDB (Plug-in for MongoDB), MQ (Plug-in for WebSphere MQ), OData (Plug-in for OData), S3 (Plug-in for Amazon S3), ServiceNow (Plug-in for ServiceNow), SFDC (Plug-in for Salesforce.com).",
             "Type": "String"
         },
-        "EcrRepoName": {
-            "Description": "Name of EC2 Container Registry (ECR) to be created to store customized image. This image will have the plugins you selected installed within it.",
-            "Type": "String",
-            "MinLength": 4,
-            "MaxLength": 64,
-            "ConstraintDescription": "EcrRepoName parameter is mandatory."
-        },
         "InstMonitoring": {
             "Description": "Do you want to install the Monitoring Application?",
             "Type": "String",
@@ -420,6 +409,14 @@
                     "Ref": "ExtBucket"
                 },
                 "Yes"
+            ]
+        },
+        "GovCloudCondition": {
+            "Fn::Equals": [
+                {
+                    "Ref": "AWS::Region"
+                },
+                "us-gov-west-1"
             ]
         },
         "HasVolSize": {
@@ -626,20 +623,12 @@
             "Condition": "CreateS3Bucket",
             "DeletionPolicy": "Retain"
         },
-        "ECRRepository": {
-            "Type": "AWS::ECR::Repository",
-            "Properties": {
-                "RepositoryName": {
-                    "Ref": "EcrRepoName"
-                }
-            }
+        "BwceEcrRepository": {
+            "Type": "AWS::ECR::Repository"
         },
-        "MonitoringRepository": {
+        "BwceMonitoringRepository": {
             "Type": "AWS::ECR::Repository",
-            "Condition": "InstallMonitoringApp",
-            "Properties": {
-                "RepositoryName": "mon-repo-233"
-            }
+            "Condition": "InstallMonitoringApp"
         },
         "DefaultTargetGroup": {
             "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
@@ -816,7 +805,7 @@
                                                 "Fn::If": [
                                                     "InstallMonitoringApp",
                                                     {
-                                                        "Ref": "MonitoringRepository"
+                                                        "Ref": "BwceMonitoringRepository"
                                                     },
                                                     {
                                                         "Ref": "AWS::NoValue"
@@ -837,7 +826,7 @@
                                                 "Fn::If": [
                                                     "InstallMonitoringApp",
                                                     {
-                                                        "Ref": "MonitoringRepository"
+                                                        "Ref": "BwceMonitoringRepository"
                                                     },
                                                     {
                                                         "Ref": "AWS::NoValue"
@@ -975,7 +964,7 @@
                                 },
                                 ".amazonaws.com/",
                                 {
-                                    "Ref": "EcrRepoName"
+                                    "Ref": "BwceEcrRepository"
                                 },
                                 ":2.3.3\n",
                                 "docker push ",
@@ -988,7 +977,7 @@
                                 },
                                 ".amazonaws.com/",
                                 {
-                                    "Ref": "EcrRepoName"
+                                    "Ref": "BwceEcrRepository"
                                 },
                                 ":2.3.3\n",
                                 "   /opt/aws/bin/cfn-init -v --stack ",
@@ -1322,7 +1311,40 @@
                 },
                 "UserData": {
                     "Fn::Base64": {
-                        "Fn::Sub": "#!/bin/bash\necho 'BWCE-AWS: Install Docker-ce...'\nsudo yum install -y yum-utils device-mapper-persistent-data lvm2\nsudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo\nsudo yum install -y docker-ce\nsudo systemctl start docker\nsudo usermod -aG docker $USER\ncd /tmp\ncd -\necho ECS_CLUSTER=${ECSCluster} >> /etc/ecs/ecs.config\necho ECS_CHECKPOINT=false >> /etc/ecs/ecs.config\necho ECS_ENGINE_TASK_CLEANUP_WAIT_DURATION=8m >> /etc/ecs/ecs.config\necho ECS_DISABLE_IMAGE_CLEANUP=false >> /etc/ecs/ecs.config\necho ECS_IMAGE_CLEANUP_INTERVAL=15m >> /etc/ecs/ecs.config\necho ECS_IMAGE_MINIMUM_CLEANUP_AGE=1h >> /etc/ecs/ecs.config\necho ECS_NUM_IMAGES_DELETE_PER_CYCLE=5 >> /etc/ecs/ecs.config\nsudo systemctl enable docker-container@ecs-agent.service\nsudo systemctl start docker-container@ecs-agent.service\n/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration\n/opt/aws/bin/cfn-signal -e $? --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSAutoScalingGroup\nexport PATH=/home/ec2-user/.local/bin:$PATH\nexport PYTHONPATH=$PYTHONPATH:/home/ec2-user/.local/lib/python2.7/site-packages\n$( aws ecr get-login --region ${AWS::Region} --no-include-email )\n"
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                "#!/bin/bash",
+                                "echo 'BWCE-AWS: Install Docker-ce...'",
+                                "sudo yum install -y yum-utils device-mapper-persistent-data lvm2",
+                                "sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo",
+                                "sudo yum install -y docker-ce",
+                                "sudo systemctl start docker",
+                                "sudo usermod -aG docker $USER",
+                                "cd /tmp",
+                                "cd -",
+                                "echo ECS_CLUSTER=${ECSCluster} >> /etc/ecs/ecs.config",
+                                "echo ECS_CHECKPOINT=false >> /etc/ecs/ecs.config",
+                                "echo ECS_ENGINE_TASK_CLEANUP_WAIT_DURATION=8m >> /etc/ecs/ecs.config",
+                                "echo ECS_DISABLE_IMAGE_CLEANUP=false >> /etc/ecs/ecs.config",
+                                "echo ECS_IMAGE_CLEANUP_INTERVAL=15m >> /etc/ecs/ecs.config",
+                                "echo ECS_IMAGE_MINIMUM_CLEANUP_AGE=1h >> /etc/ecs/ecs.config",
+                                "echo ECS_NUM_IMAGES_DELETE_PER_CYCLE=5 >> /etc/ecs/ecs.config",
+                                "sudo systemctl enable docker-container@ecs-agent.service",
+                                "sudo systemctl start docker-container@ecs-agent.service",
+                                {
+                                    "Fn::Sub": "/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration"
+                                },
+                                {
+                                    "Fn::Sub": "/opt/aws/bin/cfn-signal -e $? --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSAutoScalingGroup"
+                                },
+                                "export PATH=/home/ec2-user/.local/bin:$PATH",
+                                "export PYTHONPATH=$PYTHONPATH:/home/ec2-user/.local/lib/python2.7/site-packages",
+                                {
+                                    "Fn::Sub": "$( aws ecr get-login --region ${AWS::Region} --no-include-email )"
+                                }
+                            ]
+                        ]
                     }
                 }
             },
@@ -1410,6 +1432,9 @@
                                         "ecs:DiscoverPollEndpoint",
                                         "ecs:Poll",
                                         "ecs:RegisterContainerInstance",
+                                        "ecs:RegisterTaskDefinition",
+                                        "ecs:ListTaskDefinitions",
+                                        "ecs:RunTask",
                                         "ecs:StartTelemetrySession",
                                         "ecs:UpdateContainerInstancesState",
                                         "ecs:Submit*",
@@ -1647,6 +1672,31 @@
                     }
                 ]
             }
+        },
+        "ECRCleanupStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "DependsOn": "BwceEcrRepository",
+            "Properties": {
+                "TemplateURL": {
+                    "Fn::Sub": [
+                        "https://${QSS3BucketName}.${QSS3Region}.amazonaws.com/${QSS3KeyPrefix}templates/cleanup-repo.template",
+                        {
+                            "QSS3Region": {
+                                "Fn::If": [
+                                    "GovCloudCondition",
+                                    "s3-us-gov-west-1",
+                                    "s3"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                "Parameters": {
+                    "Repository": {
+                        "Ref": "BwceEcrRepository"
+                    }
+                }
+            }
         }
     },
     "Outputs": {
@@ -1680,6 +1730,15 @@
                 ]
             }
         },
+        "StudioRole": {
+            "Description": "ARN of the IAM Role applied to BWCE Studio Instance",
+            "Value": {
+                "Fn::GetAtt": [
+                    "StudioRole",
+                    "Arn"
+                ]
+            }
+        },
         "AutoScalingGroup": {
             "Description": "A reference to the Auto Scaling Group.",
             "Value": {
@@ -1698,10 +1757,22 @@
                 "Fn::Sub": "https://console.aws.amazon.com/ecs/home?region=${AWS::Region}#/clusters/${ECSCluster}/services"
             }
         },
+        "BwceEcrRepository": {
+           "Description": "Name of the ECR Repository created to store customized image. This image will have the plugins you selected installed within it.",
+            "Value": {
+                "Ref": "BwceEcrRepository"
+            }
+        },
+        "BwceMonitoringRepository": {
+            "Description": "Name of the ECR Repository created to store monitoring image",
+            "Value": {
+                "Ref": "BwceEcrRepository"
+            }
+        },
         "ECR": {
             "Description": "A reference to the Amazon ECR (Amazon EC2 Container Registry).",
             "Value": {
-                "Fn::Sub": "https://console.aws.amazon.com/ecs/home?region=${AWS::Region}#/repositories/${EcrRepoName}#images"
+                "Fn::Sub": "https://console.aws.amazon.com/ecs/home?region=${AWS::Region}#/repositories/${BwceEcrRepository}#images"
             }
         },
         "S3Bucket": {
