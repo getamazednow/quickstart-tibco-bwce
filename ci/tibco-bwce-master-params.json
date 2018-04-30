@@ -60,14 +60,6 @@
         "ParameterValue": "$[taskcat_genaz_2]"
     },
     {
-        "ParameterKey": "InstMonitoring",
-        "ParameterValue": "Yes"
-    },
-    {
-        "ParameterKey": "MonInstanceType",
-        "ParameterValue": "t2.medium"
-    },
-    {
         "ParameterKey": "StudioPassword",
         "ParameterValue": "$[alfred_genpass_8]"
     }
